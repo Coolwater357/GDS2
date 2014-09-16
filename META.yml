@@ -2,13 +2,14 @@
 build_requires: {}
 dynamic_config: 0
 name: GDS2
-version: 3.32
+version: 3.33
 author: [SCHUMACK Ken Schumack]
 abstract: GDS2 stream module
 license: artistic
 resources:
-  license: http://opensource.org/licenses/artistic-license-1.0
+  license: http://opensource.org/licenses/artistic-license-2.0
   homepage: https://metacpan.org/module/GDS2
+  repository: https://github.com/Coolwater357/GDS2
 requires:
   perl: 5.008001
 configure_requires:
@@ -17,5 +18,5 @@ distribution_type: module
 provides:
   GDS2:
     file: lib/GDS2.pm
-    version: 3.32
+    version: 3.33
 
