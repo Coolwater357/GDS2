@@ -26,7 +26,6 @@ This module is free software. It may be used, redistributed
 and/or modified under the terms of the Perl Artistic License.
 ( see http://www.perl.com/pub/a/language/misc/Artistic.html )
  Have fun, Ken
- perl -le '$_=q(Zpbhgnpe@pvnt.uxa);$_=~tr/n-sa-gt-zh-mZ/a-zS/;print;'
 
 =head1 DESCRIPTION
 
@@ -46,10 +45,6 @@ http://sourceforge.net/projects/gds2/
 # returnRecordAsPerl() was created to facilitate the creation of
 # parameterized gds2 data with perl. -Years later Andreas Pawlak
 # pointed out a endian problem that needed to be addressed.
-#
-# 2014-02-08 modified 02create.t after learning that Joe Walsh was
-# using the test program to learn how to use module (please
-# look at examples and POD instead).
 #
 # POD documentation is sprinkled throughout the file in an
 # attempt at Literate Programming style (which Perl partly supports ...
@@ -487,6 +482,8 @@ $G_epsilon *= 1; #ensure it's a number
         print $gds2File -> returnRecordAsString(-compact=>1);
     }
 
+  Dump from the command line of a bzip2 compressed file:
+  perl -MGDS2 -MFileHandle -MIPC::Open3 -e '$f1=new FileHandle;$f0=new FileHandle;open3($f0,$f1,$f1,"bzcat test.gds.bz2");$gds=new GDS2(-fileHandle=>$f1);while($gds->readGds2Record){print $gds->returnRecordAsString(-compact=>1)}'
 
   Create a complete GDS2 stream file from scratch:
     #!/usr/bin/perl -w
@@ -529,6 +526,9 @@ $G_epsilon *= 1; #ensure it's a number
   my $gds2File  = new GDS2(-fileName => "filename.gds2"); ## to read
   my $gds2File2 = new GDS2(-fileName => ">filename.gds2"); ## to write
 
+  -or- provide your own fileHandle:
+
+  my $gds2File  = new GDS2(-fileHandle => $fh); ## e.g. to attach to a compression/decompression pipe
 
 =cut
 
@@ -537,10 +537,51 @@ sub new
     my($class,%arg) = @_;
     my $self = {};
     bless $self,$class || ref $class || $GDS2::DefaultClass;
+
     my $fileName = $arg{'-fileName'};
-    unless (defined $fileName)
+    $fileName = "" unless (defined $fileName);
+
+    my $fileHandle = $arg{'-fileHandle'};
+    $fileHandle = "" unless (defined $fileHandle);
+    
+    if ($fileName && $fileHandle)
     {
-        die "new expects a gds2 file name. Missing -fileName => 'name' $!";
+        die "new expects a gds2 file name -OR- a file handle. Do not give both.";
+    }
+    unless ($fileName || $fileHandle)
+    {
+        die "new expects a -fileName => 'name' OR and -fileHandle => fh $!";
+    }
+    my $lockMode = LOCK_SH;   ## default
+    if ($fileName)
+    {
+        my $openModStr = substr($fileName,0,2);  ### looking for > or >>
+        $openModStr =~ s|^\s+||;
+        $openModStr =~ s|[^\+>]+||g;
+        my $openModeNum = O_RDONLY;
+        if ($openModStr =~ m|^\+|)
+        {
+            warn("Ignoring '+' in open mode"); ## not handling this yet...
+            $openModStr =~ s|\++||;
+        }
+        if ($openModStr eq '>')
+        {
+            $openModeNum = O_WRONLY|O_CREAT;
+            $lockMode = LOCK_EX;
+            $fileName =~ s|^$openModStr||;
+        }
+        elsif ($openModStr eq '>>')
+        {
+            $openModeNum = O_WRONLY|O_APPEND;
+            $lockMode = LOCK_EX;
+            $fileName =~ s|^$openModStr||;
+        }
+        $fileHandle = new IO::File;
+        $fileHandle -> open("$fileName",$openModeNum) or die "Unable to open $fileName because $!";
+        if (HAVE_FLOCK)
+        {
+            flock($fileHandle,$lockMode) or die "File lock on $fileName failed because $!";
+        }
     }
     my $resolution = $arg{'-resolution'};
     unless (defined $resolution)
@@ -548,34 +589,6 @@ sub new
         $resolution=1000;
     }
     die "new expects a positive integer resolution. ($resolution) $!" if (($resolution <= 0) || ($resolution !~ m|^\d+$|));
-    my $lockMode = LOCK_SH;   ## default
-    my $openModStr = substr($fileName,0,2);  ### looking for > or >>
-    $openModStr =~ s|^\s+||;
-    $openModStr =~ s|[^\+>]+||g;
-    my $openModeNum = O_RDONLY;
-    if ($openModStr =~ m|^\+|)
-    {
-        warn("Ignoring '+' in open mode"); ## not handling this yet...
-        $openModStr =~ s|\++||;
-    }
-    if ($openModStr eq '>')
-    {
-        $openModeNum = O_WRONLY|O_CREAT;
-        $lockMode = LOCK_EX;
-        $fileName =~ s|^$openModStr||;
-    }
-    elsif ($openModStr eq '>>')
-    {
-        $openModeNum = O_WRONLY|O_APPEND;
-        $lockMode = LOCK_EX;
-        $fileName =~ s|^$openModStr||;
-    }
-    my $fileHandle = new IO::File;
-    $fileHandle -> open("$fileName",$openModeNum) or die "Unable to open $fileName because $!";
-    if (HAVE_FLOCK)
-    {
-        flock($fileHandle,$lockMode) or die "File lock on $fileName failed because $!";
-    }
     binmode $fileHandle,':raw';
     $self -> {'Fd'}         = $fileHandle -> fileno;
     $self -> {'FileHandle'} = $fileHandle;
@@ -1139,7 +1152,7 @@ sub printSref
     my $angle = $arg{'-angle'};
     if (! defined $angle)
     {
-        $angle=0;
+        $angle = -1; #not really... just means not specified
     }
     else
     {
@@ -1151,7 +1164,7 @@ sub printSref
         my $data=$reflect.'0'x15; ## 16 'bit' string
         $self -> printGds2Record(-type => 'STRANS',-data => $data);
         $self -> printGds2Record(-type => 'MAG',-data => $mag) if ($mag);
-        $self -> printGds2Record(-type => 'ANGLE',-data => $angle) if ($angle);
+        $self -> printGds2Record(-type => 'ANGLE',-data => $angle) if ($angle >= 0);
     }
     my @xyTmp=(); ##don't pollute array passed in
     for(my $i=0;$i<=$#$xy;$i++) ## e.g. 3.4 in -> 3400 out
@@ -1237,7 +1250,7 @@ sub printAref
     my $angle = $arg{'-angle'};
     if (! defined $angle)
     {
-        $angle=0;
+        $angle = -1; #not really... just means not specified
     }
     else
     {
@@ -1249,7 +1262,7 @@ sub printAref
         my $data=$reflect.'0'x15; ## 16 'bit' string
         $self -> printGds2Record(-type => 'STRANS',-data => $data);
         $self -> printGds2Record(-type => 'MAG',-data => $mag) if ($mag);
-        $self -> printGds2Record(-type => 'ANGLE',-data => $angle) if ($angle);
+        $self -> printGds2Record(-type => 'ANGLE',-data => $angle) if ($angle >= 0);
     }
     my $columns = $arg{'-columns'};
     if ((! defined $columns)||($columns <= 0))
@@ -1413,7 +1426,7 @@ sub printText
     my $angle = $arg{'-angle'};
     if (! defined $angle)
     {
-        $angle=0;
+        $angle = -1; #not really... just means not specified
     }
     else
     {
@@ -1429,7 +1442,7 @@ sub printText
         $self -> printGds2Record(-type=>'STRANS',-data=>$data);
     }
     $self -> printGds2Record(-type=>'MAG',-data=>$mag) if ($mag);
-    $self -> printGds2Record(-type=>'ANGLE',-data=>$angle) if ($angle);
+    $self -> printGds2Record(-type=>'ANGLE',-data=>$angle) if ($angle >= 0);
     $self -> printGds2Record(-type=>'XY',-data=>[$x,$y]);
     $self -> printGds2Record(-type=>'STRING',-data=>$string);
     $self -> printGds2Record(-type=>'ENDEL');
@@ -2341,7 +2354,7 @@ sub returnRecordTypeString
   usage:
   while ($gds2File -> readGds2Record)
   {
-      print $gds2File -> returnRecordAsString;
+      print $gds2File -> returnRecordAsString(-compact=>1);
   }
 
 =cut
@@ -2705,9 +2718,15 @@ sub printAngle
 {
     my($self,%arg) = @_;
     my $angle = $arg{'-num'};
-    $angle=0 unless (defined $angle);
-    $angle=posAngle($angle);
-    $self -> printGds2Record(-type => 'ANGLE',-data => $angle) if ($angle);
+    if (defined $angle)
+    {
+        $angle=posAngle($angle);
+    }
+    else
+    {
+        $angle = -1; #not really... just means not specified
+    }
+    $self -> printGds2Record(-type => 'ANGLE',-data => $angle) if ($angle >= 0);
 }
 ################################################################################
 

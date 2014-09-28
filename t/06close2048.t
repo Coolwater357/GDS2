@@ -1,11 +1,4 @@
-# Before `Build install' is performed this script should be runnable with
-# `Build test'. After `Build install' it should work as `perl t/02create.t'
-
-######################### We start with some black magic to print on failure.
-
 # Change 1..1 below to 1..last_test_to_print .
-# (It may become useful if the test is moved to ./t subdirectory.)
-
 BEGIN { $| = 1; print "1..2\n"; }
 END {print "not ok 2\n" unless $loaded;}
 use GDS2;
@@ -19,7 +12,7 @@ print "ok 1\n";
 # of the test code):
 
 use strict;
-sub ok 
+sub ok
 {
     my ($n, $result, @info) = @_;
     if ($result) {
@@ -33,7 +26,7 @@ sub ok
 }
 
 my $gds2File = new GDS2(-fileName=>'>test.gds');
-$gds2File -> printInitLib(-name=>'testlib'); 
+$gds2File -> printInitLib(-name=>'testlib');
 $gds2File -> printBgnstr(-name=>'test');
 $gds2File -> printPath(
                 -layer=>6,
@@ -52,7 +45,7 @@ $gds2File -> printAref(
                 -xy=>[0,0],
              );
 $gds2File -> printEndstr;
-$gds2File -> printBgnstr(-name => 'contact'); 
+$gds2File -> printBgnstr(-name => 'contact');
 $gds2File -> printBoundary(
                 -layer=>10,
                 -xy=>[0,0, 1,0, 1,1, 0,1],
