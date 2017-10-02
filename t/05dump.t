@@ -75,8 +75,9 @@ close DUMPIN;
 close DUMPOUT;
 if ($good)
 {
-    unlink"testdump.gds";
+    unlink "testdump.gds";
     unlink "dump.out";
+    sleep 2;
 }
 ok(2,$good,'problem with ascii dump 2.');
 0;

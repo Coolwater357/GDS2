@@ -31,9 +31,9 @@
       },
       "runtime" : {
          "requires" : {
-            "perl" : "5.008001"
-            "Config" : "0"
-            "IO::File" : "0"
+            "perl" : "5.010001",
+            "Config" : "0",
+            "IO::File" : "0",
             "Fcntl" : "0"
          }
       }
@@ -43,8 +43,8 @@
       "homepage" : "https://metacpan.org/module/GDS2",
       "license" : [
          "http://opensource.org/licenses/artistic-license-2.0"
-      ]
+      ],
       "repository" : "https://github.com/Coolwater357/GDS2"
    },
-   "version" : "3.33"
+   "version" : "3.34"
 }

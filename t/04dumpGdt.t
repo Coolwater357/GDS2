@@ -73,8 +73,9 @@ close DUMPOLD;
 close DUMPNEW;
 if ($good)
 {
-    unlink"testdump.gds";
+    unlink "testdump.gds";
     unlink "dump.gdt";
+    sleep 2;
 }
 ok(2,$good,'problem with ascii dump.');
 0;
